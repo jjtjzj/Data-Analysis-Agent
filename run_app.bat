@@ -1,4 +1,4 @@
 @echo off
 echo Starting Agentic Data Analyst...
-python -m streamlit run app.py
+"C:\Users\JunZhang\anaconda3\python.exe" -m streamlit run app.py
 pause

@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import memory
 import agent
+from datetime import datetime
 
 # Page configuration
 st.set_page_config(page_title="Agentic Data Analyst", layout="wide")
@@ -11,6 +12,42 @@ def main():
     memory.init_memory()
     
     st.title("🤖 Agentic Data Analyst")
+    
+    # --- Custom CSS for Premium Look ---
+    st.markdown("""
+        <style>
+        /* Chat Bubbles */
+        .stChatMessage {
+            padding: 1rem;
+            border-radius: 15px;
+            margin-bottom: 10px;
+        }
+        /* User Message (Coral/Red) */
+        [data-testid="stChatMessage"][aria-label="Chat message from user"] {
+            background-color: rgba(255, 127, 80, 0.1);
+            border-left: 5px solid #FF7F50;
+        }
+        /* Assistant Message (Orange/Yellow) */
+        [data-testid="stChatMessage"][aria-label="Chat message from assistant"] {
+            background-color: rgba(255, 165, 0, 0.1);
+            border-left: 5px solid #FFA500;
+        }
+        /* Timestamp Style */
+        .chat-timestamp {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 5px;
+            text-align: right;
+        }
+        /* Reasoning Expander */
+        .stExpander {
+            border: 1px solid rgba(128, 128, 128, 0.2);
+            border-radius: 8px;
+            background-color: rgba(128, 128, 128, 0.05);
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     st.markdown("---")
 
     # --- Sidebar: Data Upload ---
@@ -22,9 +59,29 @@ def main():
             try:
                 df = pd.read_csv(uploaded_file)
                 st.session_state.df = df
-                st.success("File uploaded successfully!")
+                
+                # Quick Stats
+                st.success("File uploaded!")
+                col1, col2 = st.columns(2)
+                col1.metric("Rows", df.shape[0])
+                col2.metric("Cols", df.shape[1])
+                
                 st.write("### Data Preview")
-                st.dataframe(df.head(5))
+                st.dataframe(df.head(10), use_container_width=True)
+                
+                # Download Button
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download Full Data",
+                    data=csv,
+                    file_name=uploaded_file.name,
+                    mime='text/csv',
+                )
+                
+                # Data Types Info
+                with st.expander("📊 Column Types"):
+                    st.write(df.dtypes)
+                    
             except Exception as e:
                 st.error(f"Error reading CSV: {e}")
         
@@ -45,6 +102,7 @@ def main():
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
+                st.markdown(f'<div class="chat-timestamp">{message.get("timestamp", "")}</div>', unsafe_allow_html=True)
         
         # Chat input
         if prompt := st.chat_input("Ask a question about your data..."):
@@ -73,7 +131,11 @@ def main():
             st.info("Reasoning steps will appear here during processing.")
         
         for log in st.session_state.logs:
-            with st.expander(f"Step: {log['step']}", expanded=True):
+            # Choose icon based on step type
+            step = log['step'].lower()
+            icon = "💡" if "thought" in step or "reasoning" in step else "⚙️" if "action" in step else "🔍" if "observation" in step else "📝"
+            
+            with st.expander(f"{icon} {log['step']} ({log.get('timestamp', '')})", expanded=True):
                 st.markdown(log['detail'])
 
 if __name__ == "__main__":
