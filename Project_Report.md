@@ -1,5 +1,6 @@
 # Project Report: Agentic Data Analyst (COMPSCI 767)
-
+**Student ID**: 573765854
+**Student Email**: ajhz083@aucklanduni.ac.nz
 **GitHub Repository**: [https://github.com/jjtjzj/Data-Analysis-Agent](https://github.com/jjtjzj/Data-Analysis-Agent)
 
 ---
