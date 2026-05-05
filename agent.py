@@ -14,7 +14,8 @@ else:
     print("Warning: GEMINI_API_KEY not found in environment.")
 
 # Initialize the model
-model = genai.GenerativeModel('gemini-flash-latest')
+# Switching to gemini-1.5-flash-latest to avoid 429 quota issues on experimental models
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
 SYSTEM_PROMPT = """
 You are an expert Data Analyst agent. You have access to a pandas DataFrame named 'df'.
