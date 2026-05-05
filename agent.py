@@ -33,10 +33,11 @@ Your goal is to help the user analyze their data by following a structured Reaso
 
 def run_agent_loop(user_prompt, df):
     """
-    Executes the ReAct loop:
+    Executes the ReAct loop with Self-Correction:
     1. Generates Thought + Action.
     2. Executes Action (tools.py) to get Observation.
-    3. Repeats or provides Final Answer.
+    3. If Error, provides feedback to LLM and retries (Max 5).
+    4. Synthesizes Final Answer.
     """
     memory.clear_logs()
     
@@ -46,35 +47,50 @@ def run_agent_loop(user_prompt, df):
     
     memory.add_log("System", "Analyzing request...")
     
+    max_attempts = 5
+    attempt = 0
+    current_prompt = f"{SYSTEM_PROMPT}\n\n{conversation_context}"
+    
     try:
-        # Step 1: Reason and Act
-        response = model.generate_content(f"{SYSTEM_PROMPT}\n\n{conversation_context}")
-        response_text = response.text
-        
-        # Parse Thought
-        thought = "No thought provided."
-        if "Thought:" in response_text:
-            thought = response_text.split("Thought:")[1].split("Action:")[0].split("```")[0].strip()
-        memory.add_log("Thought", thought)
-        
-        # Check for Code Action
-        if "```python" in response_text:
-            code = response_text.split("```python")[1].split("```")[0].strip()
-            memory.add_log("Action (Code)", f"```python\n{code}\n```")
+        while attempt < max_attempts:
+            attempt += 1
+            response = model.generate_content(current_prompt)
+            response_text = response.text
             
-            # Step 2: Execute and Observe
-            observation = tools.execute_python_code(code, df)
-            memory.add_log("Observation", observation)
+            # Parse Thought
+            thought = "No thought provided."
+            if "Thought:" in response_text:
+                thought = response_text.split("Thought:")[1].split("Action:")[0].split("```")[0].strip()
             
-            # Step 3: Final Synthesis
-            final_prompt = f"{SYSTEM_PROMPT}\n\n{conversation_context}\n\nPrevious Reasoning: {thought}\nCode Executed:\n{code}\nObservation: {observation}\n\nPlease provide your Final Answer."
-            final_response = model.generate_content(final_prompt)
-            return final_response.text
-        else:
-            # If no code was generated, treat the response as the final answer or extract it
-            if "Final Answer:" in response_text:
-                return response_text.split("Final Answer:")[1].strip()
-            return response_text
+            log_prefix = f"Attempt {attempt}: " if attempt > 1 else ""
+            memory.add_log(f"{log_prefix}Thought", thought)
+            
+            # Check for Code Action
+            if "```python" in response_text:
+                code = response_text.split("```python")[1].split("```")[0].strip()
+                memory.add_log(f"{log_prefix}Action (Code)", f"```python\n{code}\n```")
+                
+                # Step 2: Execute and Observe
+                observation = tools.execute_python_code(code, df)
+                
+                if "Error during execution" in observation:
+                    memory.add_log(f"{log_prefix}Observation (Error)", observation)
+                    # Update prompt for self-correction
+                    current_prompt += f"\n\nPrevious Code Attempt:\n{code}\n\nError Received:\n{observation}\n\n**Task**: Analyze the error and provide a corrected Thought and Action (code)."
+                    continue # Retry
+                else:
+                    memory.add_log(f"{log_prefix}Observation", observation)
+                    # Success! Now synthesize final answer
+                    final_prompt = f"{SYSTEM_PROMPT}\n\n{conversation_context}\n\nFinal Observation: {observation}\n\nPlease provide your Final Answer."
+                    final_response = model.generate_content(final_prompt)
+                    return final_response.text
+            else:
+                # If no code was generated, treat as final answer
+                if "Final Answer:" in response_text:
+                    return response_text.split("Final Answer:")[1].strip()
+                return response_text
+        
+        return "Agent reached maximum self-correction attempts without success."
             
     except Exception as e:
         error_msg = f"Error in agent loop: {e}"

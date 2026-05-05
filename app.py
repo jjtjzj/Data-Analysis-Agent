@@ -44,6 +44,17 @@ def main():
             border: 1px solid rgba(128, 128, 128, 0.2);
             border-radius: 8px;
             background-color: rgba(128, 128, 128, 0.05);
+            margin-bottom: 5px;
+        }
+        /* Error Style */
+        .reasoning-error {
+            border: 1px solid #FF4B4B !important;
+            background-color: rgba(255, 75, 75, 0.05) !important;
+        }
+        /* Correction Style */
+        .reasoning-correction {
+            border: 1px solid #00BFFF !important;
+            background-color: rgba(0, 191, 255, 0.05) !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -131,12 +142,22 @@ def main():
             st.info("Reasoning steps will appear here during processing.")
         
         for log in st.session_state.logs:
-            # Choose icon based on step type
-            step = log['step'].lower()
-            icon = "💡" if "thought" in step or "reasoning" in step else "⚙️" if "action" in step else "🔍" if "observation" in step else "📝"
+            # Choose icon and style based on step type
+            step_title = log['step'].lower()
+            icon = "💡" if "thought" in step_title or "reasoning" in step_title else "⚙️" if "action" in step_title else "🔍" if "observation" in step_title else "📝"
+            if "error" in step_title: icon = "❌"
             
-            with st.expander(f"{icon} {log['step']} ({log.get('timestamp', '')})", expanded=True):
-                st.markdown(log['detail'])
+            # Determine if it's a correction attempt
+            is_error = "error" in step_title
+            is_correction = "attempt" in step_title
+            
+            with st.expander(f"{icon} {log['step']} ({log.get('timestamp', '')})", expanded=is_error or is_correction):
+                if is_error:
+                    st.error(log['detail'])
+                elif is_correction:
+                    st.info(log['detail'])
+                else:
+                    st.markdown(log['detail'])
 
 if __name__ == "__main__":
     main()
