@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import memory
+import agent
 
 # Page configuration
 st.set_page_config(page_title="Agentic Data Analyst", layout="wide")
@@ -55,9 +56,15 @@ def main():
                 with st.chat_message("user"):
                     st.markdown(prompt)
                 
-                # Placeholder for assistant response (Phase 3+)
+                # Assistant response
                 with st.chat_message("assistant"):
-                    st.info("Agent logic will be implemented in Phase 3.")
+                    with st.spinner("Agent is thinking..."):
+                        response = agent.run_agent_loop(prompt, st.session_state.df)
+                        st.markdown(response)
+                        memory.add_message("assistant", response)
+                
+                # Rerun to update logs in the right column
+                st.rerun()
 
     # --- Right Column: Transparency (Reasoning Logs) ---
     with col_logs:
