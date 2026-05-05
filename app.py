@@ -5,11 +5,13 @@ import agent
 from datetime import datetime
 
 # Page configuration
-st.set_page_config(page_title="Agentic Data Analyst", layout="wide")
+st.set_page_config(page_title="Agentic Data Analyst", layout="wide", page_icon="🤖")
 
 def main():
     # Initialize session state
     memory.init_memory()
+    if "plot_generated" not in st.session_state:
+        st.session_state.plot_generated = False
     
     st.title("🤖 Agentic Data Analyst")
     
@@ -50,11 +52,6 @@ def main():
         .reasoning-error {
             border: 1px solid #FF4B4B !important;
             background-color: rgba(255, 75, 75, 0.05) !important;
-        }
-        /* Correction Style */
-        .reasoning-correction {
-            border: 1px solid #00BFFF !important;
-            background-color: rgba(0, 191, 255, 0.05) !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -100,6 +97,7 @@ def main():
         if st.button("Clear Chat"):
             st.session_state.messages = []
             st.session_state.logs = []
+            st.session_state.plot_generated = False
             st.rerun()
 
     # --- Main Layout: Two Columns ---
@@ -127,9 +125,14 @@ def main():
                 
                 # Assistant response
                 with st.chat_message("assistant"):
-                    with st.spinner("Agent is thinking..."):
+                    with st.spinner("Agent is analyzing and plotting..."):
                         response = agent.run_agent_loop(prompt, st.session_state.df)
                         st.markdown(response)
+                        
+                        # Display plot if generated
+                        if st.session_state.get("plot_generated"):
+                            st.image("plot.png", caption="Generated Visualization", use_container_width=True)
+                        
                         memory.add_message("assistant", response)
                 
                 # Rerun to update logs in the right column

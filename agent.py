@@ -3,6 +3,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import memory
 import tools
+import streamlit as st
 
 # Load environment variables
 load_dotenv()
@@ -29,17 +30,19 @@ Your goal is to help the user analyze their data by following a structured Reaso
 - Only provide ONE Thought and ONE Action (code block) at a time.
 - If no more analysis is needed, skip the Action and provide the Final Answer.
 - Always use `print()` for any values you want to see in the Observation.
+- For plots, use `plt.show()` or just create the plot; the system will capture it automatically.
 """
 
 def run_agent_loop(user_prompt, df):
     """
     Executes the ReAct loop with Self-Correction:
     1. Generates Thought + Action.
-    2. Executes Action (tools.py) to get Observation.
+    2. Executes Action (tools.py) to get Observation and Plot flag.
     3. If Error, provides feedback to LLM and retries (Max 5).
     4. Synthesizes Final Answer.
     """
     memory.clear_logs()
+    st.session_state.plot_generated = False # Reset plot flag
     
     # Prepare context
     df_info = f"Columns: {list(df.columns)}\nData Types:\n{df.dtypes}\nShape: {df.shape}"
@@ -71,7 +74,8 @@ def run_agent_loop(user_prompt, df):
                 memory.add_log(f"{log_prefix}Action (Code)", f"```python\n{code}\n```")
                 
                 # Step 2: Execute and Observe
-                observation = tools.execute_python_code(code, df)
+                exec_result = tools.execute_python_code(code, df)
+                observation = exec_result["output"]
                 
                 if "Error during execution" in observation:
                     memory.add_log(f"{log_prefix}Observation (Error)", observation)
@@ -80,6 +84,12 @@ def run_agent_loop(user_prompt, df):
                     continue # Retry
                 else:
                     memory.add_log(f"{log_prefix}Observation", observation)
+                    
+                    # Capture plot generation
+                    if exec_result.get("plot_generated"):
+                        st.session_state.plot_generated = True
+                        memory.add_log("System", "Visual chart generated! 📊")
+
                     # Success! Now synthesize final answer
                     final_prompt = f"{SYSTEM_PROMPT}\n\n{conversation_context}\n\nFinal Observation: {observation}\n\nPlease provide your Final Answer."
                     final_response = model.generate_content(final_prompt)

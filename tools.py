@@ -5,14 +5,15 @@ import matplotlib.pyplot as plt
 
 def execute_python_code(code, df):
     """
-    Executes Python code in a restricted environment and returns the output.
+    Executes Python code in a restricted environment, intercepts plots, and returns the results.
     """
+    # Clear any previous plots to ensure we only capture the new one
+    plt.clf()
+    
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
         try:
             # Create a restricted global namespace
-            # We remove __builtins__ to prevent access to functions like open, eval, etc.
-            # Then we selectively add back safe ones if needed, or just let them fail.
             restricted_globals = {
                 "__builtins__": {
                     "print": print,
@@ -36,7 +37,19 @@ def execute_python_code(code, df):
             # Execute the code
             exec(code, restricted_globals)
             
+            # Check if a plot was generated
+            plot_generated = False
+            if plt.gcf().get_axes():
+                plt.savefig("plot.png")
+                plot_generated = True
+            
             result = output.getvalue()
-            return result if result else "Code executed successfully."
+            return {
+                "output": result if result else "Code executed successfully.",
+                "plot_generated": plot_generated
+            }
         except Exception as e:
-            return f"Error during execution: {e}"
+            return {
+                "output": f"Error during execution: {e}",
+                "plot_generated": False
+            }
